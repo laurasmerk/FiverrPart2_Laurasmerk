@@ -2,31 +2,37 @@
 
 Version: vite_react_shadcn_ts_20250728_minor
 
-1. Critical Bugs
-1.1 Duplicate Email Invocation
+Overview
+
+This document outlines the major bugs that were discovered and resolved in the ExpertTest Lead Capture App (vite_react_shadcn_ts_20250728_minor).
+
+Critical Fixes Implemented
+
+1. Duplicate Email Invocation
 
 File: src/components/LeadCaptureForm.tsx
-
 Severity: Critical
-
-Status: Identified → Resolved (Lovable edits)
+Status: ✅ Fixed
 
 Problem
-Two identical supabase.functions.invoke('send-confirmation', ...) blocks existed, risking duplicate confirmation emails.
+
+Two identical supabase.functions.invoke('send-confirmation', ...) blocks were present, causing duplicate confirmation emails per form submission.
 
 Root Cause
+
 Copy-pasted try/catch blocks with the same payload and handling.
+
+Fix
+
+Removed the redundant block in LeadCaptureForm.tsx.
 
 Impact
 
-Users could receive two emails per submit
+✅ Users receive only one confirmation email per submit
 
-Higher function costs / rate-limit risks
+✅ Reduced function costs and avoided rate-limit risks
 
-Resolution
-Lovable removed one duplicate block during their fixes pass.
-
-1.2 Inconsistent State Management (Local vs Zustand)
+2. Inconsistent State Management (Local vs Zustand)
 
 Files:
 
@@ -35,209 +41,187 @@ src/components/LeadCaptureForm.tsx
 src/components/LeadCapturePage.tsx
 
 src/lib/lead-store.ts
-
 Severity: High
-
-Status: Identified → Refactored (Lovable edits)
+Status: ✅ Fixed
 
 Problem
-The form used local state for submitted and leads, while the page expected Zustand (useLeadStore).
+
+Form used local state for submitted and leads, while the page relied on Zustand (useLeadStore), leading to mismatched success state and data loss on refresh.
 
 Root Cause
-Mixed state sources, no single source of truth.
+
+Mixed use of local and global state without a single source of truth.
+
+Fix
+
+Refactored code to consistently use Zustand as the global state store.
 
 Impact
 
-Success message not appearing reliably
+✅ Success message displays reliably
 
-Data lost on refresh (session only)
+✅ Data preserved across refreshes
 
-Harder testing and maintenance
+✅ Improved testability and maintainability
 
-Resolution
-Lovable refactored to use the global Zustand store.
-
-1.3 No Database Persistence in Original Code
+3. No Database Persistence
 
 Files:
 
 src/components/LeadCaptureForm.tsx
 
 src/lib/lead-store.ts
-
 Severity: High
-
-Status: Identified → Implemented (Lovable edits, post-approval)
+Status: ✅ Fixed (post-approval)
 
 Problem
-Original form only updated local session state, not Supabase.
+
+Form submissions only updated local state; leads were lost on refresh and not persisted in Supabase.
+
+Root Cause
+
+No database connection or persistence logic implemented.
+
+Fix
+
+Created table public.leads with fields: id, name, email, industry, submitted_at, timestamps
+
+Enabled RLS with insert policies for anon/authenticated users
+
+Updated form to insert data into Supabase
 
 Impact
 
-Leads lost on refresh
+✅ Leads are now stored in Supabase
 
-No server-side data for analytics/admin
+✅ Data available for analytics and admin
 
-Resolution
+⏳ Supabase types should be regenerated for full TypeScript safety
 
-Table created: public.leads (UUID id, name, email, industry, submitted_at, timestamps)
-
-RLS policies: insert open to anon/authenticated; select restricted
-
-Form updated to insert into public.leads
-
-✅ Connected & Writing
-
-⏳ Types: Supabase types need regeneration for TS safety
-
-2. High & Medium Issues
-2.1 Redundant Success UI & Coupling
+High & Medium Fixes
+4. Redundant Success UI
 
 Files:
 
 src/components/LeadCaptureForm.tsx
 
 src/components/SuccessMessage.tsx
-
 Severity: Medium
-
-Status: Identified → Consolidated (Lovable edits)
+Status: ✅ Fixed
 
 Problem
-Success logic/UI existed inline in the form and in a separate component.
+
+Success message logic existed both inline in the form and in a separate SuccessMessage component.
+
+Root Cause
+
+UI duplication with overlapping logic.
+
+Fix
+
+Consolidated success UI into a single component.
 
 Impact
 
-Duplicate logic
+✅ Cleaner codebase
 
-Harder maintenance
+✅ Consistent transitions and user experience
 
-Inconsistent transitions
+5. Missing Custom CSS Animations
 
-Resolution
-Consolidated into a single Success component.
-
-2.2 Missing Custom CSS Animation Classes
-
-File(s): src/index.css vs component usages
-
+File: src/index.css
 Severity: Medium
-
-Status: Identified → Added (Lovable edits)
+Status: ✅ Fixed
 
 Problem
-Referenced classes (animate-slide-up, animate-glow, etc.) were not defined.
+
+Referenced classes (animate-slide-up, animate-glow, shadow-glow, etc.) were not defined, causing animations to fail and sometimes making elements invisible.
+
+Root Cause
+
+Components referenced CSS classes that weren’t declared in index.css.
+
+Fix
+
+Added the missing animation and style classes.
 
 Impact
 
-Animations not running
+✅ Animations now function correctly
 
-Elements potentially invisible
+✅ Prevented risk of “blank app” appearance
 
-Risk of “blank app” look
-
-Resolution
-Lovable added the missing CSS classes.
-
-2.3 Possible Blank Screen – External Background & No Error Boundaries
+6. External Background GIF & Missing Error Boundaries
 
 File: src/components/LeadCapturePage.tsx
-
 Severity: Medium
-
-Status: Identified (No change originally requested)
+Status: ⚠️ Identified (not fixed)
 
 Problem
 
-Page used an external GIF for background; failure could hide content.
+The page relied on an external GIF for its background. If the asset failed to load, the UI could break. Additionally, no React error boundaries existed to catch runtime errors.
 
-No error boundary present → runtime errors blank the UI.
+Root Cause
 
-Impact
-
-Intermittent blank render
-
-Hard to diagnose
+No local fallback or error handling implemented.
 
 Recommendation
 
-Add local fallback for background
+Add local fallback for background image
 
-Add React ErrorBoundary for production
+Implement React ErrorBoundary for production
 
-3. Non-Functional / UX Observations
-3.1 Design Tokens & Hardcoded Colours
+Impact
+
+❌ Risk of blank screen on failed load
+
+❌ Harder debugging of runtime issues
+
+Non-Functional / UX Observations
+7. Design Tokens & Hardcoded Colours
 
 Files: LeadCaptureForm.tsx, index.css
-
 Severity: Low
+Status: ⚠️ Identified
 
-Status: Identified
+Problem
 
-Issues
-
-Hardcoded gradients and shadows (e.g., hover:shadow-[0_0_60px_hsl(...)])
-
-Not aligned with shadcn UI tokens
+Hardcoded gradients and shadows reduced theming consistency with shadcn/tailwind tokens.
 
 Recommendation
-Map to Tailwind/shadcn design tokens for consistent theming.
 
-3.2 Accessibility & Focus Management
+Map to shadcn/tailwind design tokens for theming consistency.
 
-Files: LeadCapturePage.tsx, form flow
+8. Accessibility & Focus Management
 
+Files: LeadCapturePage.tsx, form submit flow
 Severity: Low
+Status: ⚠️ Identified
 
-Status: Identified
+Problem
 
-Issues
+Background image had generic alt text (“Background animation”)
 
-Generic alt text (“Background animation”)
-
-No focus shift to success container after submit
-
-Impact
-
-Limited screen reader support
-
-Poor keyboard UX
+No focus shift to success message after form submission
 
 Recommendation
-Improve alt text and focus management.
 
-4. Environment / Stack Notes
+Improve alt text and shift focus programmatically on submit for better screen reader and keyboard UX.
 
-Tech stack: Vite + React + TypeScript + shadcn/ui + Zustand
+Final Status
+✅ Fixed
 
-External asset: Background GIF (risk of failure)
+Duplicate email invocation removed
 
-Supabase: Configured, later connected to DB
+State management refactored to Zustand
 
-5. Reproduction & Verification
+Database persistence implemented (Supabase)
 
-Duplicate email: Pre-fix → two invocations
+Success UI consolidated
 
-State mismatch: Success UI not showing
+Missing CSS animations added
 
-Blank app risk: Broken GIF or missing CSS → blank layout
-
-Supabase persistence: Before → no insert; After → verified row in public.leads
-
-6. Final Status
-✅ Fixed / Implemented
-
-Removed duplicate email invocation
-
-Normalised state flow (Zustand)
-
-Consolidated success UI
-
-Added missing CSS animations
-
-Supabase table + RLS policies created and wired
-
-🔧 Still Recommended
+⚠️ Outstanding
 
 Add React ErrorBoundary
 
